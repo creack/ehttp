@@ -7,8 +7,9 @@ import (
 
 // Common errors.
 var (
-	InternalError = NewErrorf(http.StatusInternalServerError, "internal error")
-	Unauthtorized = NewErrorf(http.StatusUnauthorized, "unauthorized")
+	InternalServerError = NewErrorf(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
+	BadRequest          = NewErrorf(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+	Unauthtorized       = NewErrorf(http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
 )
 
 // Error is a basic error including the http return code.
