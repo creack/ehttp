@@ -15,7 +15,7 @@ type Handle func(http.ResponseWriter, *http.Request, httprouter.Params) error
 // MWError is the middleware taking care of the returned error.
 func MWError(hdlr Handle) httprouter.Handle {
 	return func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
-		ww := &ehttp.ResponseWriter{ResponseWriter: w}
+		ww := ehttp.NewResponseWriter(w)
 		if err := hdlr(ww, req, p); err != nil {
 			ehttp.HandleError(ww, err)
 			return

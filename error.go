@@ -1,6 +1,15 @@
 package ehttp
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+)
+
+// Common errors.
+var (
+	InternalError = NewErrorf(http.StatusInternalServerError, "internal error")
+	Unauthtorized = NewErrorf(http.StatusUnauthorized, "unauthorized")
+)
 
 // Error is a basic error including the http return code.
 type Error struct {

@@ -17,9 +17,9 @@ func TestHandleErrorNil(t *testing.T) {
 	defer log.SetOutput(os.Stderr)
 
 	rec := httptest.NewRecorder()
-	w := &ResponseWriter{ResponseWriter: rec}
+	w := NewResponseWriter(rec)
 	HandleError(w, nil)
-	assertInt(t, http.StatusInternalServerError, int(w.code))
+	assertInt(t, http.StatusInternalServerError, w.Code())
 	assertInt(t, 0, buf.Len())
 	assertString(t, "<nil>\n", rec.Body.String())
 }
@@ -30,9 +30,9 @@ func TestHandleErrorCommon(t *testing.T) {
 	defer log.SetOutput(os.Stderr)
 
 	rec := httptest.NewRecorder()
-	w := &ResponseWriter{ResponseWriter: rec}
+	w := NewResponseWriter(rec)
 	HandleError(w, fmt.Errorf("fail"))
-	assertInt(t, http.StatusInternalServerError, int(w.code))
+	assertInt(t, http.StatusInternalServerError, w.Code())
 	assertInt(t, 0, buf.Len())
 	assertString(t, "fail\n", rec.Body.String())
 }
@@ -43,9 +43,9 @@ func TestHandleErrorEHTTP(t *testing.T) {
 	defer log.SetOutput(os.Stderr)
 
 	rec := httptest.NewRecorder()
-	w := &ResponseWriter{ResponseWriter: rec}
+	w := NewResponseWriter(rec)
 	HandleError(w, NewErrorf(418, "fail"))
-	assertInt(t, 418, int(w.code))
+	assertInt(t, 418, w.Code())
 	assertInt(t, 0, buf.Len())
 	assertString(t, "fail\n", rec.Body.String())
 }
@@ -56,13 +56,13 @@ func TestHandleErrorSentHeader(t *testing.T) {
 	defer log.SetOutput(os.Stderr)
 
 	rec := httptest.NewRecorder()
-	w := &ResponseWriter{ResponseWriter: rec}
+	w := NewResponseWriter(rec)
 	w.WriteHeader(http.StatusBadGateway)
 	if _, err := w.Write([]byte("hello")); err != nil {
 		t.Fatal(err)
 	}
 	HandleError(w, NewErrorf(418, "fail"))
-	assertInt(t, http.StatusBadGateway, int(w.code))
+	assertInt(t, http.StatusBadGateway, w.Code())
 	if !strings.Contains(buf.String(), fmt.Sprintf("%s (%d)", "fail", http.StatusBadGateway)) {
 		t.Errorf("Error and status code not found in log output.\nGot: %s", buf.String())
 	}

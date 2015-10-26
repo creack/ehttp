@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync/atomic"
 )
 
 // HandlerFunc is a custom http handler extending the standard one with
@@ -17,8 +16,8 @@ type HandlerFunc func(http.ResponseWriter, *http.Request) error
 // HandleError handles the returned error from the MWError middleware.
 // Should not be manually called. Exposed to be accessed from adaptor subpackages.
 func HandleError(w *ResponseWriter, err error) {
-	if atomic.LoadInt32(&w.headerSent) != 0 {
-		log.Printf("HTTP Error (header already sent): %s (%d)", err, atomic.LoadInt32(&w.code))
+	if code := w.Code(); code != 0 {
+		log.Printf("HTTP Error (header already sent): %s (%d)", err, code)
 		return
 	}
 	if e1, ok := err.(*Error); ok {
@@ -49,7 +48,7 @@ func HandlePanic(err error, e1 interface{}) error {
 }
 
 func (hdlr HandlerFunc) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ww := &ResponseWriter{ResponseWriter: w}
+	ww := NewResponseWriter(w)
 	if err := hdlr(w, req); err != nil {
 		HandleError(ww, err)
 		return
@@ -60,7 +59,7 @@ func (hdlr HandlerFunc) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // the data to the client if the header hasn't been sent yet, otherwise, log them.
 func MWError(hdlr HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		ww := &ResponseWriter{ResponseWriter: w}
+		ww := NewResponseWriter(w)
 		if err := hdlr(ww, req); err != nil {
 			HandleError(ww, err)
 			return
