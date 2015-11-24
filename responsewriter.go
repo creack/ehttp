@@ -1,6 +1,9 @@
 package ehttp
 
 import (
+	"bufio"
+	"fmt"
+	"net"
 	"net/http"
 	"sync/atomic"
 )
@@ -38,4 +41,13 @@ func (w *ResponseWriter) WriteHeader(code int) {
 func (w *ResponseWriter) Write(buf []byte) (int, error) {
 	atomic.CompareAndSwapInt32(w.code, 0, int32(http.StatusOK))
 	return w.ResponseWriter.Write(buf)
+}
+
+// Hijack wraps the underlying Hijack if available.
+func (w *ResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a hijacker")
+	}
+	return hijacker.Hijack()
 }
