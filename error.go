@@ -10,6 +10,7 @@ var (
 	InternalServerError = NewErrorf(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 	BadRequest          = NewErrorf(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
 	Unauthorized        = NewErrorf(http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+	NotFound            = NewErrorf(http.StatusNotFound, http.StatusText(http.StatusNotFound))
 )
 
 // Error is a basic error including the http return code.
