@@ -51,3 +51,8 @@ func (w *ResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	}
 	return hijacker.Hijack()
 }
+
+// Flush wraps the underlying Flush. Panic if not a Flusher.
+func (w *ResponseWriter) Flush() {
+	w.ResponseWriter.(http.Flusher).Flush()
+}
