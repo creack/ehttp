@@ -51,7 +51,7 @@ func HandlePanic(err error, e1 interface{}) error {
 
 func (hdlr HandlerFunc) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ww := NewResponseWriter(w)
-	if err := hdlr(w, req); err != nil {
+	if err := hdlr(ww, req); err != nil {
 		HandleError(ww, err)
 		return
 	}
@@ -75,13 +75,18 @@ func MWErrorPanic(hdlr HandlerFunc) http.HandlerFunc {
 		defer func() {
 			if e1 := recover(); e1 != nil {
 				var name string
-				pc, file, line, ok := runtime.Caller(3)
-				if !ok {
-					name, file, line = "<unkown>", "<unknown>", -1
-				} else {
+				skip := 0
+			begin:
+				pc, file, line, ok := runtime.Caller(3 + skip)
+				if ok {
 					name = runtime.FuncForPC(pc).Name()
 					name = path.Base(name)
 					file = path.Base(file)
+					// If there is a runtime panic (nil dereference or other) we endup with a runtime callstack. Skip until out of it.
+					if len(name) > 7 && name[:7] == "runtime" {
+						skip++
+						goto begin
+					}
 				}
 				err = HandlePanic(err, e1)
 				if e2, ok := err.(*Error); ok {

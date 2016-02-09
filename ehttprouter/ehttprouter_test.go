@@ -91,5 +91,5 @@ func TestMWErrorPanicInt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertString(t, "418", string(body))
+	assertString(t, "(int) 418", string(body))
 }
