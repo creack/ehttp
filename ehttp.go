@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path"
+	"runtime"
 )
 
 // HandlerFunc is a custom http handler extending the standard one with
@@ -41,7 +43,7 @@ func HandlePanic(err error, e1 interface{}) error {
 	// we have a panic and no given error.
 	e2, ok := e1.(error)
 	if !ok { // the panic is not an error, create an error out of the string representation of the panic.
-		return fmt.Errorf("%v", e1)
+		return fmt.Errorf("(%T) %v", e1, e1)
 	}
 	// return the panic error
 	return e2
@@ -72,7 +74,21 @@ func MWErrorPanic(hdlr HandlerFunc) http.HandlerFunc {
 	return MWError(func(w http.ResponseWriter, req *http.Request) (err error) {
 		defer func() {
 			if e1 := recover(); e1 != nil {
+				var name string
+				pc, file, line, ok := runtime.Caller(3)
+				if !ok {
+					name, file, line = "<unkown>", "<unknown>", -1
+				} else {
+					name = runtime.FuncForPC(pc).Name()
+					name = path.Base(name)
+					file = path.Base(file)
+				}
 				err = HandlePanic(err, e1)
+				if e2, ok := err.(*Error); ok {
+					e2.error = fmt.Errorf("[%s %s:%d] %s", name, file, line, e2.error)
+				} else {
+					err = fmt.Errorf("[%s %s:%d] %s", name, file, line, err)
+				}
 			}
 		}()
 		return hdlr(w, req)

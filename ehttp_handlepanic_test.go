@@ -67,5 +67,5 @@ func TestHandlePanicNonError(t *testing.T) {
 
 	err := HandlePanic(nil, "fail")
 	assertInt(t, 0, buf.Len())
-	assertString(t, "fail", err.Error())
+	assertString(t, "(string) fail", err.Error())
 }
