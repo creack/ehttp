@@ -32,6 +32,11 @@ func (e Error) Error() string {
 	return e.error.Error()
 }
 
+// GetError exposes the underlying error.
+func (e Error) GetError() error {
+	return e.error
+}
+
 // NewErrorf creates a new http error including a status code.
 func NewErrorf(code int, f string, args ...interface{}) error {
 	return &Error{
