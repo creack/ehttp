@@ -4,6 +4,7 @@
 package ehttp
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -22,12 +23,17 @@ func HandleError(w *ResponseWriter, err error) {
 		log.Printf("HTTP Error (header already sent): %s (%d)", err, code)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 	if e1, ok := err.(*Error); ok {
 		w.WriteHeader(e1.Code())
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-	fmt.Fprintln(w, err)
+	_ = json.NewEncoder(w).Encode(struct {
+		Errors []string `json:"errors"`
+	}{
+		Errors: []string{err.Error()},
+	}) // Best effort.
 }
 
 // HandlePanic handles the panic from the handler.
