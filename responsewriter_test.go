@@ -36,7 +36,7 @@ func TestResponseWriterHijack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error trying to connect to the test server: %s", err)
 	}
-	fmt.Fprintf(client, "GET / HTTP/1.1\r\nConnection: Upgrade\r\n\r\n")
+	fmt.Fprintf(client, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\n\r\n")
 	buf := make([]byte, 512)
 	n, err := client.Read(buf)
 	if err != nil {
