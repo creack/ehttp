@@ -127,7 +127,7 @@ func TestMWErrorPanicEHTTP(t *testing.T) {
 	)
 	hdlr := func(w http.ResponseWriter, req *http.Request) error {
 		name, file, line = getCallstack(0)
-		panic(NewErrorf(418, "fail"))
+		panic(NewErrorf(http.StatusTeapot, "fail"))
 	}
 	http.HandleFunc("/", MWErrorPanic(hdlr))
 
@@ -138,7 +138,7 @@ func TestMWErrorPanicEHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertInt(t, 418, resp.StatusCode)
+	assertInt(t, http.StatusTeapot, resp.StatusCode)
 	body, err := ioutil.ReadAll(resp.Body)
 	_ = resp.Body.Close()
 	if err != nil {
@@ -156,7 +156,7 @@ func TestMWErrorPanicInt(t *testing.T) {
 	)
 	hdlr := func(w http.ResponseWriter, req *http.Request) error {
 		name, file, line = getCallstack(0)
-		panic(418)
+		panic(http.StatusTeapot)
 	}
 	http.HandleFunc("/", MWErrorPanic(hdlr))
 
@@ -173,7 +173,7 @@ func TestMWErrorPanicInt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertJSONError(t, fmt.Sprintf("[%s %s:%d] (int) 418", name, file, line+1), string(body))
+	assertJSONError(t, fmt.Sprintf("[%s %s:%d] (int) %d", name, file, line+1, http.StatusTeapot), string(body))
 }
 
 func TestMWErrorPanicMiddleware(t *testing.T) {

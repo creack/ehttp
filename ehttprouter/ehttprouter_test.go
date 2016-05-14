@@ -71,7 +71,7 @@ func TestMWErrorPanicCommon(t *testing.T) {
 
 func TestMWErrorPanicEHTTP(t *testing.T) {
 	hdlr := func(w http.ResponseWriter, req *http.Request, p httprouter.Params) error {
-		panic(ehttp.NewErrorf(418, "fail"))
+		panic(ehttp.NewErrorf(http.StatusTeapot, "fail"))
 	}
 	router := httprouter.New()
 	router.GET("/", MWErrorPanic(hdlr))
@@ -83,7 +83,7 @@ func TestMWErrorPanicEHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertInt(t, 418, resp.StatusCode)
+	assertInt(t, http.StatusTeapot, resp.StatusCode)
 	body, err := ioutil.ReadAll(resp.Body)
 	_ = resp.Body.Close()
 	if err != nil {
@@ -94,7 +94,7 @@ func TestMWErrorPanicEHTTP(t *testing.T) {
 
 func TestMWErrorPanicInt(t *testing.T) {
 	hdlr := func(w http.ResponseWriter, req *http.Request, p httprouter.Params) error {
-		panic(418)
+		panic(http.StatusTeapot)
 	}
 	router := httprouter.New()
 	router.GET("/", MWErrorPanic(hdlr))
@@ -112,7 +112,7 @@ func TestMWErrorPanicInt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertJSONError(t, "(int) 418", string(body))
+	assertJSONError(t, fmt.Sprintf("(int) %d", http.StatusTeapot), string(body))
 }
 
 func getCallstack(skip int) (string, string, int) {
