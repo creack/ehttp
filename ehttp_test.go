@@ -1,6 +1,7 @@
 package ehttp
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -26,6 +27,22 @@ func assertString(t *testing.T, expect, got string) {
 	}
 }
 
+func assertJSONError(t *testing.T, expect, got string) {
+	_, file, line := getCallstack(1)
+	expect, got = strings.TrimSpace(expect), strings.TrimSpace(got)
+
+	jErr := JSONError{}
+	if err := json.Unmarshal([]byte(got), &jErr); err != nil {
+		t.Errorf("[%s:%d] Error parsing json error: %s\n", file, line, expect)
+	}
+	for _, errStr := range jErr.Errors {
+		if errStr == expect {
+			return
+		}
+	}
+	t.Errorf("[%s:%d] Unexpected error.\nExpect:\t%s\nGot:\t%s\n", file, line, expect, got)
+}
+
 func TestHandleFunc(t *testing.T) {
 	defer func() { http.DefaultServeMux = http.NewServeMux() }()
 	hdlr := func(w http.ResponseWriter, req *http.Request) error {
@@ -46,7 +63,7 @@ func TestHandleFunc(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertString(t, "fail", string(body))
+	assertJSONError(t, "fail", string(body))
 }
 
 func TestServeHTTP(t *testing.T) {
@@ -69,7 +86,7 @@ func TestServeHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertString(t, "fail", string(body))
+	assertJSONError(t, "fail", string(body))
 }
 
 func TestMWErrorPanicCommon(t *testing.T) {
@@ -98,7 +115,7 @@ func TestMWErrorPanicCommon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertString(t, fmt.Sprintf("[%s %s:%d] fail", name, file, line+1), string(body))
+	assertJSONError(t, fmt.Sprintf("[%s %s:%d] fail", name, file, line+1), string(body))
 }
 
 func TestMWErrorPanicEHTTP(t *testing.T) {
@@ -127,7 +144,7 @@ func TestMWErrorPanicEHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertString(t, fmt.Sprintf("[%s %s:%d] fail", name, file, line+1), string(body))
+	assertJSONError(t, fmt.Sprintf("[%s %s:%d] fail", name, file, line+1), string(body))
 }
 
 func TestMWErrorPanicInt(t *testing.T) {
@@ -156,7 +173,7 @@ func TestMWErrorPanicInt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertString(t, fmt.Sprintf("[%s %s:%d] (int) 418", name, file, line+1), string(body))
+	assertJSONError(t, fmt.Sprintf("[%s %s:%d] (int) 418", name, file, line+1), string(body))
 }
 
 func TestMWErrorPanicMiddleware(t *testing.T) {
@@ -190,7 +207,7 @@ func TestMWErrorPanicMiddleware(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertString(t, fmt.Sprintf("[%s %s:%d] fail", name, file, line+1), string(body))
+	assertJSONError(t, fmt.Sprintf("[%s %s:%d] fail", name, file, line+1), string(body))
 }
 
 func TestMWErrorPanicRuntimePanic(t *testing.T) {
@@ -225,7 +242,7 @@ func TestMWErrorPanicRuntimePanic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertString(t, fmt.Sprintf("[%s %s:%d] runtime error: invalid memory address or nil pointer dereference", name, file, line+1), string(body))
+	assertJSONError(t, fmt.Sprintf("[%s %s:%d] runtime error: invalid memory address or nil pointer dereference", name, file, line+1), string(body))
 }
 
 func getCallstack(skip int) (string, string, int) {

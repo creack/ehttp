@@ -19,9 +19,9 @@ func TestHandleErrorNil(t *testing.T) {
 	rec := httptest.NewRecorder()
 	w := NewResponseWriter(rec)
 	HandleError(w, nil)
-	assertInt(t, http.StatusInternalServerError, w.Code())
+	assertInt(t, 0, w.Code())
 	assertInt(t, 0, buf.Len())
-	assertString(t, "<nil>\n", rec.Body.String())
+	assertString(t, "", rec.Body.String())
 }
 
 func TestHandleErrorCommon(t *testing.T) {
@@ -34,7 +34,7 @@ func TestHandleErrorCommon(t *testing.T) {
 	HandleError(w, fmt.Errorf("fail"))
 	assertInt(t, http.StatusInternalServerError, w.Code())
 	assertInt(t, 0, buf.Len())
-	assertString(t, "fail\n", rec.Body.String())
+	assertJSONError(t, "fail", rec.Body.String())
 }
 
 func TestHandleErrorEHTTP(t *testing.T) {
@@ -47,7 +47,7 @@ func TestHandleErrorEHTTP(t *testing.T) {
 	HandleError(w, NewErrorf(418, "fail"))
 	assertInt(t, 418, w.Code())
 	assertInt(t, 0, buf.Len())
-	assertString(t, "fail\n", rec.Body.String())
+	assertJSONError(t, "fail", rec.Body.String())
 }
 
 func TestHandleErrorSentHeader(t *testing.T) {

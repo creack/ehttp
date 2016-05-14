@@ -16,22 +16,29 @@ import (
 // an error return.
 type HandlerFunc func(http.ResponseWriter, *http.Request) error
 
+// JSONError is the struct returned to the client upon error.
+type JSONError struct {
+	Errors []string `json:"errors"`
+}
+
 // HandleError handles the returned error from the MWError middleware.
 // Should not be manually called. Exposed to be accessed from adaptor subpackages.
+// If the error is nil, then no http code is yielded.
 func HandleError(w *ResponseWriter, err error) {
 	if code := w.Code(); code != 0 {
 		log.Printf("HTTP Error (header already sent): %s (%d)", err, code)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if e1, ok := err.(*Error); ok {
+	if err == nil {
+		return
+	}
+	if e1, ok := err.(*Error); ok && e1.Code() != 0 {
 		w.WriteHeader(e1.Code())
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-	_ = json.NewEncoder(w).Encode(struct {
-		Errors []string `json:"errors"`
-	}{
+	_ = json.NewEncoder(w).Encode(JSONError{
 		Errors: []string{err.Error()},
 	}) // Best effort.
 }
