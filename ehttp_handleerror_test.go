@@ -44,8 +44,8 @@ func TestHandleErrorEHTTP(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	w := NewResponseWriter(rec)
-	HandleError(w, NewErrorf(418, "fail"))
-	assertInt(t, 418, w.Code())
+	HandleError(w, NewErrorf(http.StatusTeapot, "fail"))
+	assertInt(t, http.StatusTeapot, w.Code())
 	assertInt(t, 0, buf.Len())
 	assertJSONError(t, "fail", rec.Body.String())
 }
@@ -61,7 +61,7 @@ func TestHandleErrorSentHeader(t *testing.T) {
 	if _, err := w.Write([]byte("hello")); err != nil {
 		t.Fatal(err)
 	}
-	HandleError(w, NewErrorf(418, "fail"))
+	HandleError(w, NewErrorf(http.StatusTeapot, "fail"))
 	assertInt(t, http.StatusBadGateway, w.Code())
 	if !strings.Contains(buf.String(), fmt.Sprintf("%s (%d)", "fail", http.StatusBadGateway)) {
 		t.Errorf("Error and status code not found in log output.\nGot: %s", buf.String())

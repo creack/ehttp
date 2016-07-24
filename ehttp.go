@@ -16,7 +16,18 @@ import (
 // an error return.
 type HandlerFunc func(http.ResponseWriter, *http.Request) error
 
-// JSONError is the struct returned to the client upon error.
+// ServeHTTP implements the http.Handler interface, serving our custom prototype
+// with error support.
+// NOTE: ehttp buffers the whole output in memory to control when to send the HTTP headers.
+func (hdlr HandlerFunc) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	ww := NewResponseWriter(w)
+	if err := hdlr(ww, req); err != nil {
+		HandleError(ww, err)
+		return
+	}
+}
+
+// JSONError is the default struct returned to the client upon error.
 type JSONError struct {
 	Errors []string `json:"errors"`
 }
@@ -60,14 +71,6 @@ func HandlePanic(err error, e1 interface{}) error {
 	}
 	// return the panic error
 	return e2
-}
-
-func (hdlr HandlerFunc) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ww := NewResponseWriter(w)
-	if err := hdlr(ww, req); err != nil {
-		HandleError(ww, err)
-		return
-	}
 }
 
 // MWError is the main middleware. When an error is returned, it send

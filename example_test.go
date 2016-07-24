@@ -10,7 +10,7 @@ import (
 
 func Example_http() {
 	hdlr := func(w http.ResponseWriter, req *http.Request) error {
-		return ehttp.NewErrorf(418, "fail")
+		return ehttp.NewErrorf(http.StatusTeapot, "fail")
 	}
 	http.HandleFunc("/", ehttp.MWError(hdlr))
 	log.Fatal(http.ListenAndServe(":8080", nil))
