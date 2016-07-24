@@ -50,7 +50,7 @@ import (
 )
 
 func hdlr(w http.ResponseWriter, req *http.Request) error {
-	return ehttp.NewErrorf(418, "fail")
+	return ehttp.NewErrorf(http.StatusTeapot, "fail")
 }
 
 func main() {
@@ -75,7 +75,7 @@ import (
 )
 
 func hdlr(w http.ResponseWriter, req *http.Request) error {
-	return ehttp.NewErrorf(418, "fail")
+	return ehttp.NewErrorf(http.StatusTeapot, "fail")
 }
 
 func main() {
@@ -100,7 +100,7 @@ import (
 )
 
 func hdlr(w http.ResponseWriter, req *http.Request, p httprouter.Params) error {
-	return ehttp.NewErrorf(418, "fail")
+	return ehttp.NewErrorf(http.StatusTeapot, "fail")
 }
 
 func main() {

@@ -1,42 +1,43 @@
-package ehttp
+package ehttp_test
 
 import (
 	"log"
 	"net/http"
 
+	"github.com/creack/ehttp"
 	"github.com/gorilla/mux"
 )
 
 func Example_http() {
 	hdlr := func(w http.ResponseWriter, req *http.Request) error {
-		return NewErrorf(418, "fail")
+		return ehttp.NewErrorf(418, "fail")
 	}
-	http.HandleFunc("/", MWError(hdlr))
+	http.HandleFunc("/", ehttp.MWError(hdlr))
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func Example_gorilla() {
 	hdlr := func(w http.ResponseWriter, req *http.Request) error {
-		return NewErrorf(418, "fail")
+		return ehttp.NewErrorf(http.StatusTeapot, "fail")
 	}
 	router := mux.NewRouter()
-	router.HandleFunc("/", MWError(hdlr))
+	router.HandleFunc("/", ehttp.MWError(hdlr))
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
 
 func Example_httpPanic() {
 	hdlr := func(w http.ResponseWriter, req *http.Request) error {
-		panic(NewErrorf(418, "big fail"))
+		panic(ehttp.NewErrorf(http.StatusTeapot, "big fail"))
 	}
-	http.HandleFunc("/", MWErrorPanic(hdlr))
+	http.HandleFunc("/", ehttp.MWErrorPanic(hdlr))
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func Example_gorillaPanic() {
 	hdlr := func(w http.ResponseWriter, req *http.Request) error {
-		panic(NewErrorf(418, "big fail"))
+		panic(ehttp.NewErrorf(http.StatusTeapot, "big fail"))
 	}
 	router := mux.NewRouter()
-	router.HandleFunc("/", MWErrorPanic(hdlr))
+	router.HandleFunc("/", ehttp.MWErrorPanic(hdlr))
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
