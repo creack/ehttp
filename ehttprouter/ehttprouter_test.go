@@ -1,49 +1,38 @@
 package ehttprouter
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"path"
-	"runtime"
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/creack/ehttp"
 	"github.com/julienschmidt/httprouter"
 )
 
-func assertInt(t *testing.T, expect, got int) {
-	_, file, line := getCallstack(1)
-	if expect != got {
-		t.Errorf("[%s:%d] Unexpected result.\nExpect:\t%d\nGot:\t%d\n", file, line, expect, got)
+func TestMWErrorCommon(t *testing.T) {
+	hdlr := func(w http.ResponseWriter, req *http.Request, p httprouter.Params) error {
+		return fmt.Errorf("fail")
 	}
-}
+	router := httprouter.New()
+	router.GET("/", MWError(hdlr))
 
-func assertString(t *testing.T, expect, got string) {
-	_, file, line := getCallstack(1)
-	expect, got = strings.TrimSpace(expect), strings.TrimSpace(got)
-	if expect != got {
-		t.Errorf("[%s:%d] Unexpected result.\nExpect:\t%s\nGot:\t%s\n", file, line, expect, got)
-	}
-}
+	ts := httptest.NewServer(router)
+	defer ts.Close()
 
-func assertJSONError(t *testing.T, expect, got string) {
-	_, file, line := getCallstack(1)
-	expect, got = strings.TrimSpace(expect), strings.TrimSpace(got)
-
-	jErr := ehttp.JSONError{}
-	if err := json.Unmarshal([]byte(got), &jErr); err != nil {
-		t.Errorf("[%s:%d] Error parsing json error: %s\n", file, line, expect)
+	resp, err := http.Get(ts.URL)
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, errStr := range jErr.Errors {
-		if errStr == expect {
-			return
-		}
+	assertInt(t, http.StatusInternalServerError, resp.StatusCode)
+	body, err := ioutil.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
-	t.Errorf("[%s:%d] Unexpected error.\nExpect:\t%s\nGot:\t%s\n", file, line, expect, got)
+	assertJSONError(t, "fail", string(body))
 }
 
 func TestMWErrorPanicCommon(t *testing.T) {
@@ -115,15 +104,134 @@ func TestMWErrorPanicInt(t *testing.T) {
 	assertJSONError(t, fmt.Sprintf("(int) %d", http.StatusTeapot), string(body))
 }
 
-func getCallstack(skip int) (string, string, int) {
-	var name string
-	pc, file, line, ok := runtime.Caller(1 + skip)
-	if !ok {
-		name, file, line = "<unkown>", "<unknown>", -1
-	} else {
-		name = runtime.FuncForPC(pc).Name()
-		name = path.Base(name)
-		file = path.Base(file)
+func TestWrappedHelperMethods(t *testing.T) {
+	router := New(nil, "", true, nil)
+
+	testHandler := func(w http.ResponseWriter, req *http.Request, params httprouter.Params) error {
+		return ehttp.NewErrorf(http.StatusTeapot, "fail")
 	}
-	return name, file, line
+
+	methods := map[string]func(string, Handle){
+		"GET":     router.GET,
+		"DELETE":  router.DELETE,
+		"OPTIONS": router.OPTIONS,
+		"PATCH":   router.PATCH,
+		"POST":    router.POST,
+		"PUT":     router.PUT,
+	}
+	for _, method := range methods {
+		method("/", testHandler)
+	}
+
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+
+	for methodName := range methods {
+		req, err := http.NewRequest(methodName, ts.URL, nil)
+		if err != nil {
+			t.Fatalf("Error creating new request for method %s: %s", methodName, err)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("Error connecting to test server for method %s: %s", methodName, err)
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			t.Fatalf("Error reading response from test server for method %s: %s", methodName, err)
+		}
+		assertInt(t, http.StatusTeapot, resp.StatusCode)
+		assertString(t, "fail", string(body))
+		if t.Failed() {
+			t.Logf("Assert error for method %s", methodName)
+			break
+		}
+	}
+
+	// Specicif test for HEAD.
+	router = New(nil, "", false, nil)
+	ch := make(chan struct{}, 1)
+	defer close(ch)
+	testHandler = func(w http.ResponseWriter, req *http.Request, params httprouter.Params) error {
+		ch <- struct{}{}
+		return ehttp.NewErrorf(http.StatusTeapot, "fail")
+	}
+	router.HEAD("/", testHandler)
+	ts2 := httptest.NewServer(router)
+	defer ts2.Close()
+
+	resp, err := http.Head(ts2.URL)
+	if err != nil {
+		t.Fatalf("Error connecting to test server for method %s: %s", "HEAD", err)
+	}
+	assertInt(t, http.StatusTeapot, resp.StatusCode)
+
+	timer := time.NewTimer(2 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		t.Fatal("Timeout waiting fro the HEAD call")
+	case <-ch:
+	}
+}
+
+func TestDummyPanicHandler(t *testing.T) {
+	router := New(nil, "", false, nil)
+	// No-op. Makeing sure that it is a function and not a field.
+	router.PanicHandler()
+}
+
+func TestWrappedHandleMethods(t *testing.T) {
+	testHandler := func(w http.ResponseWriter, req *http.Request, params httprouter.Params) error {
+		return ehttp.BadRequest
+	}
+
+	router := New(nil, "", false, nil)
+	router.Handle("GET", "/a", testHandler)
+	router.HandlerFunc("GET", "/b", func(http.ResponseWriter, *http.Request) {})
+	router.Handler("GET", "/c", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+	}))
+
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/a")
+	if err != nil {
+		t.Fatalf("Error connecting to test server: %s", err)
+	}
+	_ = resp.Body.Close()
+	assertInt(t, http.StatusBadRequest, resp.StatusCode)
+
+	resp, err = http.Get(ts.URL + "/b")
+	if err != nil {
+		t.Fatalf("Error connecting to test server: %s", err)
+	}
+	_ = resp.Body.Close()
+	assertInt(t, http.StatusOK, resp.StatusCode)
+
+	resp, err = http.Get(ts.URL + "/c")
+	if err != nil {
+		t.Fatalf("Error connecting to test server: %s", err)
+	}
+	_ = resp.Body.Close()
+	assertInt(t, http.StatusConflict, resp.StatusCode)
+}
+
+func TestWrappedSpecialMethods(t *testing.T) {
+	router := New(nil, "", false, nil)
+	testHandler := func(http.ResponseWriter, *http.Request, httprouter.Params) error {
+		return nil
+	}
+	router.GET("/b", testHandler)
+
+	if handle, _, _ := router.Lookup("GET", "/a"); handle != nil {
+		t.Fatal("Unset handler path lookup should return a nil handler")
+	}
+	if handle, _, _ := router.Lookup("GET", "/b"); handle == nil {
+		t.Fatal("Set handler path lookup should return the handler")
+	}
+
+	// Dummy call for coverage. Already tested in httprouter package.
+	router.ServeFiles("/f/*filepath", nil)
 }

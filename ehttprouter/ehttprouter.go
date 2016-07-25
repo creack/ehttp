@@ -15,9 +15,9 @@ type Handle func(http.ResponseWriter, *http.Request, httprouter.Params) error
 
 // Router wraps *github.com/julienschmidt/httprouter.Router with error management.
 type Router struct {
-	Router       *httprouter.Router // Underlying httprouter.Router.
-	mux          *ehttp.ServeMux    // ehttp mux.
-	recoverPanic bool               // Flag to know whether or not handle panics.
+	*httprouter.Router                 // Underlying httprouter.Router.
+	mux                *ehttp.ServeMux // ehttp mux.
+	recoverPanic       bool            // Flag to know whether or not handle panics.
 }
 
 // DefaultRouter is the default router for direct access.
@@ -35,6 +35,10 @@ func New(sendErrorCallback func(ehttp.ResponseWriter, *http.Request, error), err
 		recoverPanic: recoverPanic,
 	}
 }
+
+// PanicHandler is a place holder to disable unwanted access to the underlying field.
+// Panic is handled via ehttprouter instead.
+func (r *Router) PanicHandler() {}
 
 // middlewareSelect applies the error middleware.
 // If the recoverPanic flag is set, recover panics, otherwise, just handle errors.
