@@ -3,7 +3,6 @@ package ehttp
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -264,7 +263,7 @@ func TestDefaultMWError(t *testing.T) {
 }
 
 func TestCustomErrorCallback(t *testing.T) {
-	callback := func(w io.Writer, err error) {
+	callback := func(w ResponseWriter, req *http.Request, err error) {
 		fmt.Fprintf(w, "custom error callback: %s", err)
 	}
 	mux := NewServeMux(callback, "application/json", false, nil)

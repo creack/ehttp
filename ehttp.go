@@ -6,7 +6,6 @@ package ehttp
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -17,21 +16,21 @@ import (
 // ServeMux wraps *net/http.ServeMux for ehttp.
 type ServeMux struct {
 	ServeMux         *http.ServeMux
-	errorContentType string                 // Content-Type to use for the error cases.
-	recoverPanic     bool                   // Flag to know whether or not to recover from panics.
-	log              *log.Logger            // Custom logger to use for errors.
-	sendError        func(io.Writer, error) // Callback to send error to the client.
+	errorContentType string                                     // Content-Type to use for the error cases.
+	recoverPanic     bool                                       // Flag to know whether or not to recover from panics.
+	log              *log.Logger                                // Custom logger to use for errors.
+	sendError        func(ResponseWriter, *http.Request, error) // Callback to send error to the client.
 }
 
 // NewServeMux emulates net/http.NewServeMux but returns a *github.com/creack/ehttp.ServeMux.
 // Logger default to the default log.Logger if nil.
 // sendErrorCallback default to `fmt.Fprintf(w, "%s\n", err)` if nil.
-func NewServeMux(sendErrorCallback func(io.Writer, error), errorContentType string, recoverPanic bool, logger *log.Logger) *ServeMux {
+func NewServeMux(sendErrorCallback func(ResponseWriter, *http.Request, error), errorContentType string, recoverPanic bool, logger *log.Logger) *ServeMux {
 	if logger == nil {
 		logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
 	if sendErrorCallback == nil {
-		sendErrorCallback = func(w io.Writer, err error) {
+		sendErrorCallback = func(w ResponseWriter, req *http.Request, err error) {
 			fmt.Fprintf(w, "%s\n", err)
 		}
 	}
@@ -69,7 +68,7 @@ func (sm *ServeMux) MWError(handler HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ww := NewResponseWriter(w)
 		if err := handler(ww, req); err != nil {
-			sm.HandleError(ww, err)
+			sm.HandleError(ww, req, err)
 			return
 		}
 	}
@@ -109,7 +108,7 @@ func (sm *ServeMux) MWErrorPanic(handler HandlerFunc) http.HandlerFunc {
 // HandleError handles the returned error from the MWError middleware.
 // Should not be manually called. Exposed to be accessed from adaptor subpackages.
 // If the error is nil, then no http code is yielded.
-func (sm *ServeMux) HandleError(w ResponseWriter, err error) {
+func (sm *ServeMux) HandleError(w ResponseWriter, req *http.Request, err error) {
 	if code := w.Code(); code != 0 {
 		sm.log.Printf("HTTP Error (header already sent): %s (%d)", err, code)
 		return
@@ -126,7 +125,7 @@ func (sm *ServeMux) HandleError(w ResponseWriter, err error) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	sm.sendError(w, err)
+	sm.sendError(w, req, err)
 }
 
 // HandlePanic handles the panic from the handler.
@@ -155,8 +154,10 @@ func (sm *ServeMux) HandlePanic(err error, e1 interface{}) error {
 // - SendError callback: Send errors wraps in a json object with the key "errors" as a type []string.
 // - RecoverPanic:       false.
 var DefaultServeMux = &ServeMux{
-	ServeMux:         http.DefaultServeMux,
-	sendError:        func(w io.Writer, err error) { _ = json.NewEncoder(w).Encode(&JSONError{Errors: []string{err.Error()}}) },
+	ServeMux: http.DefaultServeMux,
+	sendError: func(w ResponseWriter, _ *http.Request, err error) {
+		_ = json.NewEncoder(w).Encode(&JSONError{Errors: []string{err.Error()}})
+	},
 	errorContentType: "application/json; charset=utf-8",
 	recoverPanic:     false,
 	log:              log.New(os.Stderr, "", log.LstdFlags),
@@ -171,7 +172,7 @@ type HandlerFunc func(http.ResponseWriter, *http.Request) error
 func (f HandlerFunc) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ww := NewResponseWriter(w)
 	if err := f(ww, req); err != nil {
-		DefaultServeMux.HandleError(ww, err)
+		DefaultServeMux.HandleError(ww, req, err)
 		return
 	}
 }
@@ -182,8 +183,8 @@ type JSONError struct {
 }
 
 // HandleError exposes HandleError from the DefaultServeMux.
-func HandleError(w ResponseWriter, err error) {
-	DefaultServeMux.HandleError(w, err)
+func HandleError(w ResponseWriter, req *http.Request, err error) {
+	DefaultServeMux.HandleError(w, req, err)
 }
 
 // HandlePanic exposes HandlePanic from the DefaultServeMux.

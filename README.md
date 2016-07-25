@@ -61,6 +61,51 @@ func main() {
 }
 ```
 
+## customized net/http.
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/creack/ehttp"
+)
+
+func hdlr(w http.ResponseWriter, req *http.Request) error {
+	return ehttp.NewErrorf(http.StatusTeapot, "fail")
+}
+
+func main() {
+	// Define our error format and how to expose it to the client.
+	type customError struct {
+		Error    string `json:"error"`
+		HTTPCode int    `json:"http_code"`
+	}
+	errorHandler := func(w ehttp.ResponseWriter, req *http.Request,  err error) {
+		_ = json.NewEncoder(w).Encode(customError{
+			Error:    err.Error(),
+			HTTPCode: w.Code(),
+		})
+	}
+
+	// Define a cutom logger for unexpected events (double header send).
+	logger := log.New(os.Stderr, "", log.LstdFlags)
+
+	// Create the mux.
+	mux := ehttp.NewServeMux(errorHandler, "application/text; charset=utf-8", false, logger)
+
+	// Register the handler.
+	mux.HandleFunc("/", hdlr)
+
+	// Start serve the mux.
+	log.Fatal(http.ListenAndServe(":8080", mux))
+}
+```
+
 ## gorilla/mux
 
 ```go
