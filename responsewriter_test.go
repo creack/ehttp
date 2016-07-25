@@ -1,6 +1,7 @@
 package ehttp
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -8,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Enforce that *response and *http2responseWriter implements the proper interaces.
@@ -26,6 +28,19 @@ var (
 	_ http.Flusher        = (*http2responseWriter)(nil)
 	_ http.ResponseWriter = (*http2responseWriter)(nil)
 )
+
+func TestResponseWriterHijackNotHijcaker(t *testing.T) {
+	respW := httptest.NewRecorder()
+	r := &response{
+		&http2responseWriter{
+			ResponseWriter: respW,
+		},
+	}
+	if _, _, err := r.Hijack(); err == nil {
+		t.Fatalf("*net/http/httptest.ResonseRecoreded hijack should fail.")
+	}
+
+}
 
 func TestResponseWriterHijack(t *testing.T) {
 	ts := httptest.NewServer(HandlerFunc(func(w http.ResponseWriter, req *http.Request) error {
@@ -80,4 +95,176 @@ func TestResponseWriterFlush(t *testing.T) {
 		t.Fatalf("Unexpected message from test server.\nExpect:\t%s\nGot:\t%s", expect, got)
 	}
 	close(ch)
+}
+
+func TestResponseWriterCloseNotifer(t *testing.T) {
+	var ch <-chan bool
+	ts := httptest.NewServer(HandlerFunc(func(w http.ResponseWriter, req *http.Request) error {
+		ch = w.(http.CloseNotifier).CloseNotify()
+		fmt.Fprintf(w, "hello")
+		return nil
+	}))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL)
+	if err != nil {
+		t.Fatalf("Error fetching test server: %s", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	buf := make([]byte, 512)
+	n, err := resp.Body.Read(buf)
+	if err != nil && err != io.EOF {
+		t.Fatalf("Error reading from test server: %s", err)
+	}
+	buf = buf[:n]
+	if expect, got := "hello", string(buf); expect != got {
+		t.Fatalf("Unexpected message from test server.\nExpect:\t%s\nGot:\t%s", expect, got)
+	}
+
+	// Terminates the server and wait for the notification.
+	ts.Close()
+
+	timer := time.NewTimer(2 * time.Second)
+	defer timer.Stop()
+
+	select {
+	case <-ch:
+	case <-timer.C:
+		t.Fatal("Timeout waiting for the CloseNotifier notification")
+	}
+}
+
+func TestResponseWriterWriteString(t *testing.T) {
+	ts := httptest.NewServer(HandlerFunc(func(w http.ResponseWriter, req *http.Request) error {
+		if _, ok := w.(writeStringer); !ok {
+			return fmt.Errorf("responseWriter is not a writeString: %T", w)
+		}
+		_, err := io.WriteString(w, "hello")
+		return err
+	}))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL)
+	if err != nil {
+		t.Fatalf("Error fetching test server: %s", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	buf := make([]byte, 512)
+	n, err := resp.Body.Read(buf)
+	if err != nil && err != io.EOF {
+		t.Fatalf("Error reading from test server: %s", err)
+	}
+	buf = buf[:n]
+	if expect, got := "hello", string(buf); expect != got {
+		t.Fatalf("Unexpected message from test server.\nExpect:\t%s\nGot:\t%s", expect, got)
+	}
+}
+
+func TestResponseWriterReadFrom(t *testing.T) {
+	ts := httptest.NewServer(HandlerFunc(func(w http.ResponseWriter, req *http.Request) error {
+		if _, ok := w.(io.ReaderFrom); !ok {
+			return fmt.Errorf("responseWriter is not a readerFrom: (%T)", w)
+		}
+		rr, ww := io.Pipe()
+		go func() {
+			_, _ = io.WriteString(ww, "hello")
+			_ = ww.Close()
+		}()
+		_, err := io.Copy(w, rr)
+		return err
+	}))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL)
+	if err != nil {
+		t.Fatalf("Error fetching test server: %s", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	buf := make([]byte, 512)
+	n, err := resp.Body.Read(buf)
+	if err != nil && err != io.EOF {
+		t.Fatalf("Error reading from test server: %s", err)
+	}
+	buf = buf[:n]
+	if expect, got := "hello", string(buf); expect != got {
+		t.Fatalf("Unexpected message from test server.\nExpect:\t%s\nGot:\t%s", expect, got)
+	}
+}
+
+func TestResponseWriterNotReadFrom(t *testing.T) {
+	ts := httptest.NewServer(HandlerFunc(func(w http.ResponseWriter, req *http.Request) error {
+		// Change the underlying type to http2responseWriter which is not an io.ReaderFrom.
+		w = &response{
+			&http2responseWriter{
+				ResponseWriter: &http2responseWriter{
+					ResponseWriter: w,
+				},
+			},
+		}
+		if _, ok := w.(io.ReaderFrom); !ok {
+			return fmt.Errorf("responseWriter is not a readerFrom: (%T)", w)
+		}
+		rr, ww := io.Pipe()
+		go func() {
+			_, _ = io.WriteString(ww, "hello")
+			_ = ww.Close()
+		}()
+		_, err := io.Copy(w, rr)
+		if err != ErrNotReaderFrom {
+			return fmt.Errorf("Expected error when using io.ReaderFrom while not being implemented. Got: %v", err)
+		}
+		return nil
+	}))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL)
+	if err != nil {
+		t.Fatalf("Error fetching test server: %s", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		buf := bytes.NewBuffer(nil)
+		_, _ = io.Copy(buf, resp.Body)
+		t.Fatalf("Unexpected status code: %d (%s)", resp.StatusCode, buf)
+	}
+}
+
+// dummyResponseWriter implements ehttp.ResponseWriter, but does not implement writeStringer.
+type dummyResponseWriter struct{ http.ResponseWriter }
+
+func (*dummyResponseWriter) Code() int { return 0 }
+
+func TestResponseWriterNotWriteString(t *testing.T) {
+	ts := httptest.NewServer(HandlerFunc(func(w http.ResponseWriter, req *http.Request) error {
+		w = &response{
+			&http2responseWriter{
+				ResponseWriter: dummyResponseWriter{ResponseWriter: w},
+				code:           new(int32),
+			},
+		}
+		// Event though not implemented, it should work using io.Writer.
+		_, err := io.WriteString(w, "hello")
+		return err
+	}))
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL)
+	if err != nil {
+		t.Fatalf("Error fetching test server: %s", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	buf := make([]byte, 512)
+	n, err := resp.Body.Read(buf)
+	if err != nil && err != io.EOF {
+		t.Fatalf("Error reading from test server: %s", err)
+	}
+	buf = buf[:n]
+	if expect, got := "hello", string(buf); expect != got {
+		t.Fatalf("Unexpected message from test server.\nExpect:\t%s\nGot:\t%s", expect, got)
+	}
 }

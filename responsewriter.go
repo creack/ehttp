@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 )
 
+// TODO: add support for *net/http/httptest.ResponseRecorder. (Missing net/http.CloseNotifer interface).
+
 // Common errors.
 var (
 	ErrNotHijacker   = errors.New("not a net/http.Hijacker")
