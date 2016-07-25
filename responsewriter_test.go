@@ -101,6 +101,8 @@ func TestResponseWriterCloseNotifer(t *testing.T) {
 	var ch <-chan bool
 	ts := httptest.NewServer(HandlerFunc(func(w http.ResponseWriter, req *http.Request) error {
 		ch = w.(http.CloseNotifier).CloseNotify()
+		// Disable keep alive.
+		w.Header().Set("Connection", "Close")
 		fmt.Fprintf(w, "hello")
 		return nil
 	}))
@@ -122,9 +124,7 @@ func TestResponseWriterCloseNotifer(t *testing.T) {
 		t.Fatalf("Unexpected message from test server.\nExpect:\t%s\nGot:\t%s", expect, got)
 	}
 
-	// Terminates the server and wait for the notification.
-	ts.Close()
-
+	// Wait for the notification.
 	timer := time.NewTimer(2 * time.Second)
 	defer timer.Stop()
 

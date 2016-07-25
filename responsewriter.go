@@ -129,7 +129,7 @@ func (w *http2responseWriter) Flush() {
 }
 
 // CloseNotify exposes the underlying net/http.CloseNotifier interface.
-// Panics if not avilable.
+// Panics if not available.
 func (w *http2responseWriter) CloseNotify() <-chan bool {
 	return w.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }
