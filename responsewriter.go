@@ -29,15 +29,18 @@ func (w ResponseWriter) Code() int {
 	return int(atomic.LoadInt32(w.code))
 }
 
-// WriteHeader wraps underlying WriteHeader
+// WriteHeader wraps underlying WriteHeader.
+// - sends the header only if not already sent.
 // - flag that the headers have been sent
 // - store the sent code
 func (w *ResponseWriter) WriteHeader(code int) {
-	atomic.CompareAndSwapInt32(w.code, 0, int32(code))
-	w.ResponseWriter.WriteHeader(code)
+	if atomic.CompareAndSwapInt32(w.code, 0, int32(code)) {
+		w.ResponseWriter.WriteHeader(code)
+	}
 }
 
 // Write wraps the underlying Write and flag that the headers have been sent.
+// Following the net/http behavior, if no http status code has been set, assume http.StatusOK.
 func (w *ResponseWriter) Write(buf []byte) (int, error) {
 	atomic.CompareAndSwapInt32(w.code, 0, int32(http.StatusOK))
 	return w.ResponseWriter.Write(buf)
