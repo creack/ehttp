@@ -3,7 +3,6 @@ package ehttp
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,8 +12,8 @@ import (
 
 func TestHandleErrorNil(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	log.SetOutput(buf)
-	defer log.SetOutput(os.Stderr)
+	DefaultServeMux.log.SetOutput(buf)
+	defer DefaultServeMux.log.SetOutput(os.Stderr)
 
 	rec := httptest.NewRecorder()
 	w := NewResponseWriter(rec)
@@ -26,8 +25,8 @@ func TestHandleErrorNil(t *testing.T) {
 
 func TestHandleErrorCommon(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	log.SetOutput(buf)
-	defer log.SetOutput(os.Stderr)
+	DefaultServeMux.log.SetOutput(buf)
+	defer DefaultServeMux.log.SetOutput(os.Stderr)
 
 	rec := httptest.NewRecorder()
 	w := NewResponseWriter(rec)
@@ -39,8 +38,8 @@ func TestHandleErrorCommon(t *testing.T) {
 
 func TestHandleErrorEHTTP(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	log.SetOutput(buf)
-	defer log.SetOutput(os.Stderr)
+	DefaultServeMux.log.SetOutput(buf)
+	defer DefaultServeMux.log.SetOutput(os.Stderr)
 
 	rec := httptest.NewRecorder()
 	w := NewResponseWriter(rec)
@@ -52,8 +51,8 @@ func TestHandleErrorEHTTP(t *testing.T) {
 
 func TestHandleErrorSentHeader(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	log.SetOutput(buf)
-	defer log.SetOutput(os.Stderr)
+	DefaultServeMux.log.SetOutput(buf)
+	defer DefaultServeMux.log.SetOutput(os.Stderr)
 
 	rec := httptest.NewRecorder()
 	w := NewResponseWriter(rec)
