@@ -149,8 +149,76 @@ func hdlr(w http.ResponseWriter, req *http.Request, p httprouter.Params) error {
 }
 
 func main() {
+	router := ehttprouter.New(nil, "", false, nil)
+	router.GET("/", hdlr)
+	log.Fatal(http.ListenAndServe(":8080", router))
+}
+```
+
+## raw httprouter
+
+```go
+package main
+
+import (
+	"log"
+	"net/http"
+
+	"github.com/creack/ehttp"
+	"github.com/creack/ehttp/ehttprouter"
+	"github.com/julienschmidt/httprouter"
+)
+
+func hdlr(w http.ResponseWriter, req *http.Request, p httprouter.Params) error {
+	return ehttp.NewErrorf(http.StatusTeapot, "fail")
+}
+
+func main() {
 	router := httprouter.New()
 	router.GET("/", ehttprouter.MWError(hdlr))
+	log.Fatal(http.ListenAndServe(":8080", router))
+}
+```
+
+## customized httprouter
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/creack/ehttp"
+	"github.com/creack/ehttp/ehttprouter"
+	"github.com/julienschmidt/httprouter"
+)
+
+func hdlr(w http.ResponseWriter, req *http.Request, p httprouter.Params) error {
+	return ehttp.NewErrorf(http.StatusTeapot, "fail")
+}
+
+func main() {
+	// Define our error format and how to expose it to the client.
+	type customError struct {
+		Error    string `json:"error"`
+		HTTPCode int    `json:"http_code"`
+	}
+	errorHandler := func(w ehttp.ResponseWriter, req *http.Request,  err error) {
+		_ = json.NewEncoder(w).Encode(customError{
+			Error:    err.Error(),
+			HTTPCode: w.Code(),
+		})
+	}
+
+	// Define a cutom logger for unexpected events (double header send).
+	logger := log.New(os.Stderr, "", log.LstdFlags)
+
+	// Create the mux.
+	router := ehttprouter.NewServeMux(errorHandler, "application/text; charset=utf-8", true, logger)
+	router.GET("/", hdlr)
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
 ```
