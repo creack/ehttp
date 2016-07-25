@@ -53,7 +53,7 @@ func (sm *ServeMux) HandlerFunc(handler func(http.ResponseWriter, *http.Request)
 	return sm.MWError(handler)
 }
 
-// HandleFunc adds tje givem handler to the underlying ServeMux.
+// HandleFunc adds the given handler to the underlying ServeMux.
 func (sm *ServeMux) HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request) error) {
 	sm.ServeMux.Handle(pattern, sm.HandlerFunc(handler))
 }
