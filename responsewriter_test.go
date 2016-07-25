@@ -2,6 +2,7 @@ package ehttp
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -9,23 +10,28 @@ import (
 	"testing"
 )
 
-// Enforce that ResponseWriter implements the proper http interaces.
+// Enforce that *response and *http2responseWriter implements the proper interaces.
 var (
-	_ http.ResponseWriter = (*ResponseWriter)(nil)
-	_ http.Hijacker       = (*ResponseWriter)(nil)
-	_ http.Flusher        = (*ResponseWriter)(nil)
+	_ io.ReaderFrom       = (*response)(nil)
+	_ io.Writer           = (*response)(nil)
+	_ writeStringer       = (*response)(nil)
+	_ http.CloseNotifier  = (*response)(nil)
+	_ http.Flusher        = (*response)(nil)
+	_ http.Hijacker       = (*response)(nil)
+	_ http.ResponseWriter = (*response)(nil)
+
+	_ io.Writer           = (*http2responseWriter)(nil)
+	_ writeStringer       = (*http2responseWriter)(nil)
+	_ http.CloseNotifier  = (*http2responseWriter)(nil)
+	_ http.Flusher        = (*http2responseWriter)(nil)
+	_ http.ResponseWriter = (*http2responseWriter)(nil)
 )
 
 func TestResponseWriterHijack(t *testing.T) {
-	r := &ResponseWriter{}
-	if _, _, err := r.Hijack(); err == nil {
-		t.Fatalf("Empty response writer should fail to hijack")
-	}
-
 	ts := httptest.NewServer(HandlerFunc(func(w http.ResponseWriter, req *http.Request) error {
 		conn, _, err := w.(http.Hijacker).Hijack()
 		if err != nil {
-			return fmt.Errorf("Error hijacking connection: %s", err)
+			return fmt.Errorf("Error hijacking connection: %s (%T)", err, w)
 		}
 		fmt.Fprintf(conn, "hello")
 		return conn.Close()

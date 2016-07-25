@@ -35,7 +35,7 @@ type JSONError struct {
 // HandleError handles the returned error from the MWError middleware.
 // Should not be manually called. Exposed to be accessed from adaptor subpackages.
 // If the error is nil, then no http code is yielded.
-func HandleError(w *ResponseWriter, err error) {
+func HandleError(w ResponseWriter, err error) {
 	if code := w.Code(); code != 0 {
 		log.Printf("HTTP Error (header already sent): %s (%d)", err, code)
 		return
