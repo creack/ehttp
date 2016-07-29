@@ -77,6 +77,10 @@ type response struct {
 // assume it is a *net/http.response and use *github.com/creack/ehttp.response, otherwise,
 // assume it is a *net/http.http2responseWriter and use *github.com/creack/ehttp.http2responseWriter.
 func NewResponseWriter(w http.ResponseWriter) ResponseWriter {
+	// If w is already an ehttp.ReponseWriter, return it.
+	if ww, ok := w.(ResponseWriter); ok {
+		return ww
+	}
 	ret := &http2responseWriter{
 		ResponseWriter: w,
 		code:           new(int32),

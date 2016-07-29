@@ -268,3 +268,17 @@ func TestResponseWriterNotWriteString(t *testing.T) {
 		t.Fatalf("Unexpected message from test server.\nExpect:\t%s\nGot:\t%s", expect, got)
 	}
 }
+
+func TestNewResponseWriter(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	w := NewResponseWriter(recorder)
+	w1 := NewResponseWriter(recorder)
+	w2 := NewResponseWriter(w)
+
+	if w != w2 {
+		t.Fatalf("NewResposneWriter called with an ehttp.ResopnseWriter should return the given writer")
+	}
+	if w == w1 {
+		t.Fatalf("NewResposneWriter called with a regular http.ResponseWriter should wrap it and return a new object")
+	}
+}
