@@ -1,6 +1,6 @@
 # ehttp
 
-[![GitHub release](https://img.shields.io/github/release/creack/ehttp.svg?maxAge=2592000)]() [![GoDoc](https://godoc.org/github.com/creack/ehttp?status.svg)](https://godoc.org/github.com/creack/ehttp) [![Build Status](https://travis-ci.org/creack/ehttp.svg?branch=master)](https://travis-ci.org/creack/ehttp) [![Coverage Status](https://coveralls.io/repos/creack/ehttp/badge.svg?branch=master&service=github)](https://coveralls.io/github/creack/ehttp?branch=master)
+[![GitHub release](https://img.shields.io/github/release/creack/ehttp.svg?maxAge=2592000)]() [![GoDoc](https://godoc.org/github.com/creack/ehttp?status.svg)](https://godoc.org/github.com/creack/ehttp) [![Build Status](https://travis-ci.org/creack/ehttp.svg?branch=master)](https://travis-ci.org/creack/ehttp) [![Coverage Status](https://coveralls.io/repos/creack/ehttp/badge.svg?branch=master&service=github)](https://coveralls.io/github/creack/ehttp?branch=master) [![Sourcegraph](https://sourcegraph.com/github.com/creack/ehttp/-/badge.svg)](https://sourcegraph.com/github.com/creack/ehttp?badge)
 
 This package allows you to write http handlers returning an error.
 
