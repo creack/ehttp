@@ -98,40 +98,64 @@ func TestResponseWriterFlush(t *testing.T) {
 }
 
 func TestResponseWriterCloseNotifer(t *testing.T) {
-	var ch <-chan bool
+	gotReq := make(chan bool, 1)
+	sawClose := make(chan bool, 1)
+	defer close(gotReq)
+	defer close(sawClose)
+
+	// 0. Setup test server.
 	ts := httptest.NewServer(HandlerFunc(func(w http.ResponseWriter, req *http.Request) error {
-		ch = w.(http.CloseNotifier).CloseNotify()
-		// Disable keep alive.
-		w.Header().Set("Connection", "Close")
-		fmt.Fprintf(w, "hello")
+		// 3. Got the request, signal it.
+		gotReq <- true
+		// 4. Create CloseNotify chan and wait on it.
+		cc := w.(http.CloseNotifier).CloseNotify()
+		<-cc
+		// 7. Upon connection termination, the CloeNotify chan is expected
+		//    to receive something. Notify that it did.
+		sawClose <- true
 		return nil
 	}))
 	defer ts.Close()
 
-	resp, err := http.Get(ts.URL)
+	// 1. Connect to test server.
+	conn, err := net.Dial("tcp", ts.Listener.Addr().String())
 	if err != nil {
-		t.Fatalf("Error fetching test server: %s", err)
+		t.Fatalf("error dialing test server: %s", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
 
-	buf := make([]byte, 512)
-	n, err := resp.Body.Read(buf)
-	if err != nil && err != io.EOF {
-		t.Fatalf("Error reading from test server: %s", err)
-	}
-	buf = buf[:n]
-	if expect, got := "hello", string(buf); expect != got {
-		t.Fatalf("Unexpected message from test server.\nExpect:\t%s\nGot:\t%s", expect, got)
-	}
+	dieCh := make(chan bool)
+	defer close(dieCh)
+	go func() {
+		// 2. Send HTTP request.
+		if _, err := fmt.Fprintf(conn, "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n"); err != nil {
+			t.Errorf("Error sending request to testserver: %s", err)
+			return
+		}
+		// 2.1. Wait for the die signal.
+		<-dieCh
+		// 6. Die signal received, terminate the connection.
+		if err := conn.Close(); err != nil {
+			t.Errorf("Error closing connection: %s", err)
+			return
+		}
+	}()
 
 	// Wait for the notification.
 	timer := time.NewTimer(2 * time.Second)
 	defer timer.Stop()
 
-	select {
-	case <-ch:
-	case <-timer.C:
-		t.Fatal("Timeout waiting for the CloseNotifier notification")
+For:
+	for {
+		select {
+		case <-gotReq:
+			// 5. Received request signal, trigger connection die.
+			dieCh <- true
+		case <-sawClose:
+			// 8. Notification received that the CloseNotify chan worked.
+			break For
+		case <-timer.C:
+			t.Fatal("Timeout waiting for the CloseNotifier notification")
+		}
 	}
 }
 
